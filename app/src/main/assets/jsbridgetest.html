@@ -1,0 +1,72 @@
+<html>
+<head>
+    <meta content="text/html; charset=utf-8" http-equiv="content-type" />
+    <title>
+        js调用android
+    </title>
+</head>
+
+<body>
+<p>
+    <input type="text" id="result" value="" />
+    <input type="button" id="enter" value="调用原生Taost方法" onclick="testClick();" />
+</p>
+</body>
+<script>
+    function testClick() {
+        window.JSBridge.call('我是前端传来的Toast请求').then(
+            (res) => {
+                console.log(res);
+                document.getElementById("result").value = res;
+            }, (err) => {
+                console.log(err);
+            }
+        );
+    };
+
+    (function (win) {
+        var JSBridge = window.JSBridge || (window.JSBridge = {}); // 定义全局JSBridge对象
+        var callbacks = {}; // 回调事件
+        var uniqueId = 1;
+
+        JSBridge.callNative = function callNative(data, responseCallback) {
+            try {
+                var callbackId = '0';
+                if (callbacks && typeof responseCallback.resolve === 'function') {
+                    callbackId = 'cb_' + (uniqueId++) + '_' + new Date().getTime(); // 生成唯一的callbackId
+                    callbacks[callbackId] = responseCallback; // 保存回调事件
+                }
+                var obj = {
+                    callbackId: callbackId,
+                    data: data
+                };
+                // 调原生
+                window.androidPlatform.postString(JSON.stringify(obj));
+            } catch (e) {
+                console.error(e);
+            }
+            return null;
+        }
+
+        /**
+         * 处理来自原生层的响应
+         */
+        JSBridge.postMsg = function postMsg(result) {
+            // 处理返回数据
+            var call = callbacks[result.callbackId]; // callbackId需要全程“跟随”此次调用
+            call.resolve(result.data); // 成功走resolve
+            // call.reject(result.error); // 失败走reject
+        }
+
+        JSBridge.call = function (data) {
+            return new Promise(function (resolve, reject) {
+                JSBridge.callNative(data, {
+                    resolve: resolve,
+                    reject: reject
+                });
+            });
+        };
+    })(window);
+</script>
+
+</html>
